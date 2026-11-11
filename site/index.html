@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSHC progress</title>
+<meta name="description" content="How much of the game's code the OpenSHC community has rewritten so far, updated every day from the project's public data.">
+<meta property="og:title" content="OpenSHC progress">
+<meta property="og:description" content="How much of the game's code the OpenSHC community has rewritten so far, updated every day.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kotijekriv.github.io/openshc-progress/">
+<meta property="og:image" content="https://kotijekriv.github.io/openshc-progress/card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://kotijekriv.github.io/openshc-progress/card.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='6' width='14' height='4' rx='2' fill='%23e1e0d9'/%3E%3Crect x='1' y='6' width='8' height='4' rx='2' fill='%232a78d6'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --panel: #ffffff; --text: #0b0b0b; --text-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11, 11, 11, 0.10);
+    --s-main: #2a78d6; --s-branch: #eb6834; --s-progress: #1baf7a; --s-none: #d6d4cc;
+    --tip: #ffffff; --shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface: #1a1a19; --panel: #222220; --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+      --s-main: #3987e5; --s-branch: #d95926; --s-progress: #199e70; --s-none: #4a4945;
+      --tip: #2a2a28; --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --panel: #222220; --text: #f0efec; --text-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10);
+    --s-main: #3987e5; --s-branch: #d95926; --s-progress: #199e70; --s-none: #4a4945;
+    --tip: #2a2a28; --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .page { max-width: 68rem; margin: 0 auto; padding: 32px 16px 48px; display: grid; gap: 24px; }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; margin: 0; font-weight: 600; }
+  p { margin: 0; }
+  a { color: inherit; text-underline-offset: 0.18em; }
+  .lede { color: var(--text-2); max-width: 64ch; }
+  .headline { font-size: 1.2rem; max-width: 60ch; }
+  .headline b, .num b { font-variant-numeric: tabular-nums; }
+  .note { color: var(--text-2); font-size: 0.85rem; max-width: 70ch; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: grid; gap: 12px; min-width: 0; align-content: start; }
+  .tiles { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr)); }
+  .tile { gap: 2px; }
+  .tile-label { font-size: 0.8rem; color: var(--text-2); }
+  .big { font-size: 1.9rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .sub { font-size: 0.8rem; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .grid2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 26rem), 1fr)); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.82rem; color: var(--text-2); }
+  .legend i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sw-main { background: var(--s-main); } .sw-branch { background: var(--s-branch); }
+  .sw-progress { background: var(--s-progress); } .sw-none { background: var(--s-none); }
+  .stack { position: relative; }
+  .bar { display: flex; gap: 2px; height: 28px; min-width: 0; }
+  .seg { height: 100%; min-width: 2px; }
+  .seg:first-child { border-radius: 4px 0 0 4px; } .seg:last-child { border-radius: 0 4px 4px 0; } .seg:only-child { border-radius: 4px; }
+  .rows { position: relative; display: grid; gap: 8px; }
+  .row { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr; gap: 10px; align-items: center; }
+  @media (max-width: 36rem) { .row { grid-template-columns: 1fr; gap: 2px; } }
+  .row-name { font-size: 0.85rem; min-width: 0; }
+  .track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .track .bar { height: 16px; flex: none; }
+  .val { font-size: 0.8rem; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chart { position: relative; min-height: 260px; }
+  .chart svg { display: block; overflow: visible; }
+  .chart text { fill: var(--text-2); font-size: 12px; }
+  .tip { position: absolute; pointer-events: none; background: var(--tip); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 6px 10px; font-size: 0.8rem; white-space: nowrap; z-index: 2; }
+  .tip b { display: block; color: var(--text-2); font-weight: 500; }
+  .scroll { overflow-x: auto; min-width: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+  th { text-align: left; font-weight: 500; color: var(--text-2); font-size: 0.78rem; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .where { white-space: nowrap; font-size: 0.8rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
+  details summary { cursor: pointer; color: var(--text-2); font-size: 0.85rem; }
+  details[open] summary { margin-bottom: 8px; }
+  footer { color: var(--text-2); font-size: 0.82rem; display: grid; gap: 6px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .loading { color: var(--text-2); }
+</style>
+</head>
+<body>
+<main class="page">
+  <header style="display:grid;gap:8px">
+    <h1>OpenSHC progress</h1>
+    <p class="lede"><a href="https://github.com/sourcehold/OpenSHC">OpenSHC</a> is a community reimplementation of the classic game Stronghold Crusader (1.41): its code rewritten in C++, one function at a time, until every function compiles to exactly the original's machine code. This page shows how far that has come. It updates every day from the project's public data.</p>
+  </header>
+
+  <p class="headline" id="headline"><span class="loading">Loading the latest numbers…</span></p>
+
+  <section class="tiles" aria-label="Totals">
+    <div class="card tile"><span class="tile-label">Done on main</span><span class="big" data-num="on_main">—</span><span class="sub"><span data-num="pct_main">—</span>% of all functions</span></div>
+    <div class="card tile"><span class="tile-label">Added in the last 7 days</span><span class="big" data-num="week_gain">—</span><span class="sub">functions now on main</span></div>
+    <div class="card tile"><span class="tile-label">At 100% on a branch</span><span class="big" data-num="branch_100">—</span><span class="sub">done, waiting to land on main</span></div>
+    <div class="card tile"><span class="tile-label">In progress</span><span class="big" data-num="in_progress">—</span><span class="sub">a draft exists, not at 100% yet</span></div>
+    <div class="card tile"><span class="tile-label">Not started</span><span class="big" data-num="not_started">—</span><span class="sub">no draft anywhere yet</span></div>
+  </section>
+
+  <section class="card" id="whole">
+    <h2>All <span data-num="total">—</span> functions, by where they stand</h2>
+    <div class="legend">
+      <span><i class="sw-main"></i>Done on main <b data-num="on_main">—</b></span>
+      <span><i class="sw-branch"></i>100% on a branch <b data-num="branch_100">—</b></span>
+      <span><i class="sw-progress"></i>In progress <b data-num="in_progress">—</b></span>
+      <span><i class="sw-none"></i>Not started <b data-num="not_started">—</b></span>
+    </div>
+    <div class="stack" id="whole-bar"></div>
+  </section>
+
+  <section class="card" id="history">
+    <h2>Functions done on main, over time</h2>
+    <p class="note">Each step up is a merge into main. Point at the chart to see the count on a given day.</p>
+    <div class="chart" id="history-chart"></div>
+  </section>
+
+  <section class="card" id="areas">
+    <h2>What's left, by part of the game</h2>
+    <p class="note">Each bar is one part of the game, as long as its number of functions.</p>
+    <div class="legend">
+      <span><i class="sw-main"></i>Done on main</span>
+      <span><i class="sw-branch"></i>100% on a branch</span>
+      <span><i class="sw-progress"></i>In progress</span>
+      <span><i class="sw-none"></i>Not started</span>
+    </div>
+    <div class="rows" id="areas-bars"></div>
+    <details>
+      <summary>Show every namespace with functions left</summary>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Namespace</th><th class="n">Left</th><th class="n">100% on a branch</th><th class="n">In progress</th><th class="n">Not started</th><th class="n">Done on main</th><th class="n">All</th></tr></thead>
+          <tbody id="ns-body"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="bands">
+      <h2>How close the unfinished ones are</h2>
+      <p class="note">The best match any branch has for each function not at 100% yet.</p>
+      <div class="rows" id="bands-bars"></div>
+    </section>
+    <section class="card" id="waiting">
+      <h2>Done, waiting to land</h2>
+      <p class="note">Branches holding the most functions already at 100% that aren't on main yet.</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Branch</th><th class="n">Functions</th></tr></thead>
+          <tbody id="waiting-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" id="almost">
+    <h2>Almost there: 95% or better</h2>
+    <p class="note">Functions one small fix away from a full match. A good place to start if you want to help: see OpenSHC's <a href="https://sourcehold.github.io/OpenSHC/wiki.html">wiki</a>, and check the branch first, since someone may be on it.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Function</th><th>Namespace</th><th class="n">Best match</th><th>Where</th></tr></thead>
+        <tbody id="almost-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>Numbers come from OpenSHC's own progress file (the <code>status_rollup.tsv</code> its <code>pick_work.py</code> reads, which covers main and the branches the project tracks) and from main's status list and its history. Forks the progress file doesn't track can hold more finished work than shown here.</p>
+    <p id="updated">Updated —</p>
+    <p>An unofficial page by <a href="https://github.com/kotijekriv">kotijekriv</a>, one of the contributors. Not affiliated with Firefly Studios. Source: <a href="https://github.com/kotijekriv/openshc-progress">github.com/kotijekriv/openshc-progress</a>.</p>
+  </footer>
+</main>
+
+<script>
+(() => {
+  const fmt = d3.format(',');
+  const pct = (a, b) => (b ? Math.round(a / b * 1000) / 10 : 0);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const COLORS = { on_main: 'var(--s-main)', branch_100: 'var(--s-branch)', in_progress: 'var(--s-progress)', not_started: 'var(--s-none)' };
+  const LABELS = { on_main: 'Done on main', branch_100: '100% on a branch', in_progress: 'In progress', not_started: 'Not started' };
+  const STATES = ['on_main', 'branch_100', 'in_progress', 'not_started'];
+
+  function newTip(host) { const t = el('div', 'tip'); t.hidden = true; host.append(t); return t; }
+  function showTip(tip, host, ev, title, lines) {
+    tip.replaceChildren(el('b', null, title));
+    lines.forEach((l, k) => { if (k) tip.append(document.createElement('br')); tip.append(document.createTextNode(l)); });
+    tip.hidden = false;
+    const r = host.getBoundingClientRect();
+    const x = Math.min(Math.max(ev.clientX - r.left + 12, 0), Math.max(0, r.width - tip.offsetWidth));
+    tip.style.left = x + 'px';
+    tip.style.top = (ev.clientY - r.top + 16) + 'px';
+  }
+  function segBar(row, tip, host, title) {
+    const bar = el('div', 'bar');
+    const total = STATES.reduce((s, k) => s + (row[k] || 0), 0) || 1;
+    STATES.forEach((k) => {
+      const v = row[k] || 0;
+      if (v <= 0) return;
+      const seg = el('div', 'seg');
+      seg.style.flex = String(v);
+      seg.style.background = COLORS[k];
+      seg.addEventListener('pointermove', (ev) => showTip(tip, host, ev, title, [LABELS[k] + ': ' + fmt(v) + ' (' + Math.round(v / total * 100) + '%)']));
+      seg.addEventListener('pointerleave', () => { tip.hidden = true; });
+      bar.append(seg);
+    });
+    return bar;
+  }
+
+  function drawNumbers(d) {
+    const t = d.totals;
+    const nums = Object.assign({}, t, { pct_main: pct(t.on_main, t.total), week_gain: t.on_main - t.on_main_week_ago });
+    document.querySelectorAll('[data-num]').forEach((e) => {
+      const v = nums[e.dataset.num];
+      e.textContent = v == null ? '—' : (e.dataset.num === 'pct_main' ? String(v) : fmt(v));
+    });
+    const h = document.getElementById('headline');
+    h.replaceChildren(
+      el('b', null, fmt(t.on_main)), document.createTextNode(' of the game\'s '), el('b', null, fmt(t.total)),
+      document.createTextNode(' functions are done on main (' + pct(t.on_main, t.total) + '%), '),
+      el('b', null, (t.on_main - t.on_main_week_ago >= 0 ? '+' : '') + fmt(t.on_main - t.on_main_week_ago)),
+      document.createTextNode(' in the last 7 days. Another '), el('b', null, fmt(t.branch_100)),
+      document.createTextNode(' already match 100% on a branch and are waiting to land.'));
+    const when = new Date(d.generated_at);
+    const u = document.getElementById('updated');
+    u.replaceChildren(document.createTextNode('Updated ' + d3.utcFormat('%b %-d, %Y, %H:%M UTC')(when) + ', from main at '));
+    const a = el('a', null, d.main_commit);
+    a.href = 'https://github.com/sourcehold/OpenSHC/commit/' + encodeURIComponent(d.main_commit);
+    u.append(a, document.createTextNode('.'));
+  }
+
+  function drawWhole(d) {
+    const host = document.getElementById('whole-bar');
+    host.replaceChildren();
+    const tip = newTip(host);
+    host.prepend(segBar(d.totals, tip, host, 'All ' + fmt(d.totals.total) + ' functions'));
+  }
+
+  function drawAreas(d) {
+    const host = document.getElementById('areas-bars');
+    host.replaceChildren();
+    const tip = newTip(host);
+    const max = d3.max(d.areas, (r) => r.total) || 1;
+    d.areas.forEach((r) => {
+      const row = el('div', 'row');
+      const name = el('div', 'row-name', r.area);
+      const track = el('div', 'track');
+      const bar = segBar(r, tip, host, r.area);
+      bar.style.width = Math.max(r.total / max * 72, 0.6) + '%';
+      const left = r.total - r.on_main;
+      track.append(bar, el('span', 'val', left ? fmt(left) + ' left of ' + fmt(r.total) : 'all ' + fmt(r.total) + ' done'));
+      row.append(name, track);
+      host.insertBefore(row, tip);
+    });
+    const body = document.getElementById('ns-body');
+    body.replaceChildren();
+    d.namespaces.forEach((r) => {
+      const tr = el('tr');
+      tr.append(el('td', null, r.namespace));
+      [r.total - r.on_main, r.branch_100, r.in_progress, r.not_started, r.on_main, r.total].forEach((v) => tr.append(el('td', 'n', fmt(v))));
+      body.append(tr);
+    });
+  }
+
+  function drawBands(d) {
+    const host = document.getElementById('bands-bars');
+    host.replaceChildren();
+    const tip = newTip(host);
+    const max = d3.max(d.bands, (r) => r.count) || 1;
+    const all = d3.sum(d.bands, (r) => r.count) || 1;
+    d.bands.forEach((r) => {
+      const label = r.band === 'not started' ? 'Not started' : 'Best match ' + r.band;
+      const row = el('div', 'row');
+      const track = el('div', 'track');
+      const bar = el('div', 'bar');
+      bar.style.width = Math.max(r.count / max * 72, 0.6) + '%';
+      const seg = el('div', 'seg');
+      seg.style.flex = '1';
+      seg.style.background = r.band === 'not started' ? COLORS.not_started : COLORS.in_progress;
+      bar.append(seg);
+      track.append(bar, el('span', 'val', fmt(r.count)));
+      row.append(el('div', 'row-name', label), track);
+      row.addEventListener('pointermove', (ev) => showTip(tip, host, ev, label, [fmt(r.count) + ' functions (' + Math.round(r.count / all * 100) + '% of the unfinished ones)']));
+      row.addEventListener('pointerleave', () => { tip.hidden = true; });
+      host.insertBefore(row, tip);
+    });
+  }
+
+  // "owner-OpenSHC/branch" in the progress file -> a link to that branch on GitHub
+  function whereCell(where) {
+    const td = el('td', 'where');
+    const m = /^(.+?)-OpenSHC\/(.+)$/.exec(where || '');
+    if (!m) { td.textContent = where || ''; return td; }
+    const a = el('a', null, where);
+    a.href = 'https://github.com/' + encodeURIComponent(m[1]) + '/OpenSHC/tree/' + m[2].split('/').map(encodeURIComponent).join('/');
+    td.append(a);
+    return td;
+  }
+
+  function drawTables(d) {
+    const wb = document.getElementById('waiting-body');
+    wb.replaceChildren();
+    d.waiting.forEach((r) => {
+      const tr = el('tr');
+      tr.append(whereCell(r.where), el('td', 'n', fmt(r.functions)));
+      wb.append(tr);
+    });
+    const ab = document.getElementById('almost-body');
+    ab.replaceChildren();
+    d.almost.forEach((r) => {
+      const tr = el('tr');
+      const fn = el('td');
+      fn.append(el('span', null, r.function), document.createElement('br'), el('code', null, r.address));
+      tr.append(fn, el('td', null, r.namespace), el('td', 'n', r.best_pct.toFixed(1) + '%'), whereCell(r.where));
+      ab.append(tr);
+    });
+  }
+
+  function drawHistory(d) {
+    const box = document.getElementById('history-chart');
+    box.replaceChildren();
+    const parse = d3.utcParse('%Y-%m-%d');
+    const day = d3.utcFormat('%b %-d, %Y');
+    const pts = d.history.map((r) => ({ d: parse(r.date), v: r.on_main })).filter((p) => p.d);
+    if (!pts.length) return;
+    const last = pts[pts.length - 1];
+    const drawn = pts.concat([{ d: d3.utcDay.offset(last.d, 1), v: last.v }]);
+    const W = Math.max(box.clientWidth, 280);
+    const H = 260, mt = 10, mb = 28, mr = 12;
+    const svg = d3.select(box).append('svg').attr('width', W).attr('height', H).attr('viewBox', '0 0 ' + W + ' ' + H)
+      .attr('role', 'img').attr('aria-label', 'Functions done on main from ' + day(pts[0].d) + ' (' + fmt(pts[0].v) + ') to ' + day(last.d) + ' (' + fmt(last.v) + ').');
+    const y = d3.scaleLinear().domain([0, d3.max(pts, (p) => p.v) || 1]).nice().range([H - mb, mt]);
+    const ticks = y.ticks(5);
+    const gy = svg.append('g');
+    gy.selectAll('text').data(ticks).join('text').attr('text-anchor', 'end').attr('dy', '0.32em').attr('y', (v) => y(v)).text((v) => fmt(v));
+    let ml = 0;
+    gy.selectAll('text').each(function () { ml = Math.max(ml, this.getComputedTextLength()); });
+    ml = Math.ceil(ml || 34) + 10;
+    gy.selectAll('text').attr('x', ml - 8);
+    const x = d3.scaleUtc().domain([pts[0].d, drawn[drawn.length - 1].d]).range([ml, W - mr]);
+    svg.insert('g', ':first-child').selectAll('line').data(ticks).join('line')
+      .attr('x1', ml).attr('x2', W - mr).attr('y1', (v) => y(v)).attr('y2', (v) => y(v)).style('stroke', 'var(--grid)');
+    const gx = svg.append('g').attr('transform', 'translate(0,' + (H - mb) + ')')
+      .call(d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - ml) / 100))).tickFormat(d3.utcFormat('%b %-d')).tickSizeOuter(0));
+    gx.select('.domain').style('stroke', 'var(--axis)');
+    gx.selectAll('.tick line').style('stroke', 'var(--axis)');
+    svg.append('path').datum(drawn).style('fill', 'var(--s-main)').style('fill-opacity', 0.16)
+      .attr('d', d3.area().curve(d3.curveStepAfter).x((p) => x(p.d)).y0(y(0)).y1((p) => y(p.v)));
+    svg.append('path').datum(drawn).style('fill', 'none').style('stroke', 'var(--s-main)').style('stroke-width', 2)
+      .attr('d', d3.line().curve(d3.curveStepAfter).x((p) => x(p.d)).y((p) => y(p.v)));
+    // The latest count, just left of the last step and above the line (every earlier step is lower).
+    const end = svg.append('text').attr('x', x(last.d) - 6).attr('y', y(last.v) - 7).attr('text-anchor', 'end')
+      .style('fill', 'var(--text)').style('font-weight', 600).text(fmt(last.v));
+    if (y(last.v) - 7 < 12) end.attr('y', 12);
+    const cross = svg.append('line').attr('y1', mt).attr('y2', H - mb).style('stroke', 'var(--muted)').attr('visibility', 'hidden');
+    const dot = svg.append('circle').attr('r', 4.5).style('fill', 'var(--s-main)').style('stroke', 'var(--panel)').style('stroke-width', 2).attr('visibility', 'hidden');
+    const tip = newTip(box);
+    const bis = d3.bisector((p) => p.d).right;
+    svg.append('rect').attr('x', ml).attr('y', mt).attr('width', Math.max(0, W - mr - ml)).attr('height', H - mb - mt).style('fill', 'transparent')
+      .on('pointermove', (ev) => {
+        const [px] = d3.pointer(ev);
+        const at = x.invert(px);
+        const p = pts[Math.min(pts.length - 1, Math.max(0, bis(pts, at) - 1))];
+        const cx = x(at);
+        cross.attr('x1', cx).attr('x2', cx).attr('visibility', 'visible');
+        dot.attr('cx', cx).attr('cy', y(p.v)).attr('visibility', 'visible');
+        showTip(tip, box, ev, day(at), [fmt(p.v) + ' functions on main']);
+      })
+      .on('pointerleave', () => { tip.hidden = true; cross.attr('visibility', 'hidden'); dot.attr('visibility', 'hidden'); });
+  }
+
+  fetch('data/progress.json', { cache: 'no-cache' }).then((r) => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then((d) => {
+    drawNumbers(d); drawWhole(d); drawAreas(d); drawBands(d); drawTables(d); drawHistory(d);
+    let w = window.innerWidth;
+    window.addEventListener('resize', () => { if (window.innerWidth !== w) { w = window.innerWidth; drawHistory(d); } });
+  }).catch((e) => {
+    document.getElementById('headline').textContent = 'The numbers failed to load (' + e.message + '). Try again in a minute.';
+  });
+})();
+</script>
+</body>
+</html>
