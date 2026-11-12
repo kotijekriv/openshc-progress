@@ -8,8 +8,11 @@ machine code as the game's 1.41 executable. The page shows:
 
 - the share of the game's functions done on main, how many more already match 100% on a branch, and the last 7 days;
 - **a map of the whole game**: one cell per function, all 3,703, in the order they sit in the executable, coloured by
-  where each stands. It can be regrouped by part of the game (animated), searched by name, namespace or address,
-  walked with the arrow keys, and linked to: `?fn=0x0053BC20` selects a function, `?view=parts` opens the grouped view;
+  where each stands. Clicking or tapping a cell opens a card next to it with the function's name, its best match and
+  the branch holding it, with buttons to step to the previous and next function; on a phone a finger sliding along a
+  row moves the selection. The map can be regrouped by part of the game (animated), searched by name, namespace or
+  address (Enter steps through the matches), walked with the arrow keys, and linked to: `?fn=0x0053BC20` selects a
+  function, `?view=parts` opens the grouped view;
 - functions on main over time, against the goal of every function, with what is waiting on branches on top;
 - how a function gets to 100% (Ghidra, C++, MSVC 2005 SP1, reccmp, the DLL), and what the last few percent are;
 - the unfinished functions closest to 100%, how close the rest are, and the branches holding finished work.

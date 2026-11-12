@@ -30,7 +30,7 @@
 <style>
   :root {
     color-scheme: light;
-    --bg: #fbfaf7; --bg-2: #f2f0ea; --ink: #161513; --ink-2: #57544d; --ink-3: #7d7970;
+    --bg: #fbfaf7; --bg-2: #f2f0ea; --ink: #161513; --ink-2: #57544d; --ink-3: #6f6b63;
     --rule: #e6e3db; --rule-2: #cfcbc1;
     /* function states: two lit steps of one hue (on main, 100% on a branch, validated as an ordinal pair),
        an unlit track for in progress and an outline for not started */
@@ -112,8 +112,8 @@
   .controls { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; }
   .seg { display: inline-flex; border: 1px solid var(--rule-2); border-radius: 8px; padding: 2px; gap: 2px; }
   .seg button { appearance: none; border: 0; background: transparent; color: var(--ink-2); font: 500 13px/1 var(--sans); padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-  .seg button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
-  .seg button:not([aria-checked="true"]):hover { color: var(--ink); background: var(--bg-2); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .seg button:not([aria-pressed="true"]):hover { color: var(--ink); background: var(--bg-2); }
   .search { flex: 1 1 18rem; max-width: 26rem; position: relative; }
   .search input { width: 100%; font: 400 14px/1 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule-2); border-radius: 8px; padding: 10px 12px 10px 34px; }
   .search input::placeholder { color: var(--ink-3); }
@@ -132,10 +132,31 @@
   .mapbox { position: relative; min-height: 380px; }
   .mapbox canvas { display: block; touch-action: pan-y; cursor: crosshair; border-radius: 2px; }
   .mapbox canvas:focus-visible { outline-offset: 6px; }
-  .inspect { font-family: var(--mono); font-size: 13px; color: var(--ink-2); min-height: 44px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--bg-2); display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
-  .inspect .addr { color: var(--ink-3); }
-  .inspect .fn { color: var(--ink); font-weight: 500; overflow-wrap: anywhere; }
-  .inspect .st { display: inline-flex; align-items: center; gap: 7px; }
+  /* the selected function, in a card next to its cell */
+  .fcard { position: absolute; z-index: 3; width: min(25rem, 100%); display: grid; gap: 6px; padding: 10px 14px 12px; background: var(--tip); border: 1px solid var(--rule-2); border-radius: 10px; box-shadow: var(--shadow); font: 400 13px/1.45 var(--mono); color: var(--ink-2); }
+  .fcard[hidden] { display: none; }
+  .fcard .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ink-3); }
+  .fcard .fn { font-size: 14px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+  .fcard .fn span { font-weight: 400; color: var(--ink-3); }
+  .fcard .st { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; }
+  .fcard .x { appearance: none; border: 0; background: none; color: var(--ink-3); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+  .fcard .x:hover { color: var(--ink); background: var(--bg-2); }
+  .fcard .x svg { width: 12px; height: 12px; }
+  .mapbox .tip b { font-weight: 500; }
+  .legend .short { display: none; }
+  @media (max-width: 40rem) {
+    .legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .legend .long, .legend .pp { display: none; }
+    .legend .short { display: inline; white-space: nowrap; }
+    .legend button { gap: 7px; padding: 6px 4px; justify-content: flex-start; text-align: left; }
+    .legend button, .seg button { min-height: 40px; }
+    .theme { width: 40px; height: 40px; border-radius: 20px; }
+    details summary { padding: 8px 0; }
+  }
+  .near .fn .go { font-size: 11px; color: var(--ink-3); margin-left: 8px; text-decoration: none; display: inline-block; }
+  .fcard .back { appearance: none; border: 0; background: none; padding: 4px 0 0; font: inherit; font-size: 12px; color: var(--ink-2); text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 0.2em; }
+  .fcard .back:hover { color: var(--ink); text-decoration-color: currentColor; }
+  .fcard .acts { display: flex; align-items: center; gap: 2px; margin: -6px -10px -6px 0; }
   .loading { color: var(--ink-3); font-family: var(--mono); font-size: 13px; padding: 12px 0; }
 
   /* tables */
@@ -151,7 +172,7 @@
 
   /* history */
   .chart { position: relative; }
-  .chart svg { display: block; overflow: visible; }
+  .chart svg { display: block; overflow: visible; touch-action: pan-y; }
   .chart text { font-family: var(--mono); font-size: 11px; fill: var(--ink-3); }
   .chart .lab { fill: var(--ink-2); font-size: 12px; }
   .chart .lab-strong { fill: var(--ink); font-size: 13px; font-weight: 500; }
@@ -222,14 +243,15 @@
       <div>
         <p class="eyebrow">Stronghold Crusader 1.41 · matching decompilation</p>
         <h1 id="title">Stronghold Crusader, rewritten in C++ one function at a time.</h1>
-        <p class="lede"><a href="https://github.com/sourcehold/OpenSHC">OpenSHC</a> is the community's rewrite of the 2002 castle game. A function counts as done only when Microsoft Visual C++ 2005 compiles the new source to <b>the same machine code as the game's own executable</b>, checked instruction by instruction. Every finished function already runs in the game: OpenSHC's DLL hooks it in place of the original.</p>
+        <p class="lede"><a href="https://github.com/sourcehold/OpenSHC">OpenSHC</a> is the community's rewrite of the 2002 castle game. A function counts as done only when Microsoft Visual C++ 2005 compiles the new source to <b>the same machine code as the game's own executable</b>, checked instruction by instruction. Done functions are merged into main, the project's official code, and already run in the game: OpenSHC's DLL hooks them in place of the originals.</p>
       </div>
-      <div class="figure" aria-label="Share of the game's functions done on main">
+      <div class="figure" role="group" aria-label="Share of the game's functions done and merged into main">
         <div class="big"><span data-k="pct">–</span><span class="pc">%</span></div>
         <div class="meter" aria-hidden="true"><i class="m" id="meter-m" style="width:0"></i><i class="b" id="meter-b" style="width:0"></i></div>
         <p class="figcap">
-          <span><b data-k="on_main">–</b> of <b data-k="total">–</b> functions on main</span>
-          <span><b data-k="week">–</b> in the last 7 days · <b data-k="branch_100">–</b> more at 100% on branches</span>
+          <span><b data-k="on_main">–</b> of <b data-k="total">–</b> functions merged into main</span>
+          <span><b data-k="week">–</b> in the last 7 days</span>
+          <span><b data-k="branch_100">–</b> more at 100% on branches</span>
         </p>
       </div>
     </section>
@@ -240,20 +262,20 @@
         <p class="note" id="map-note">Every function of the game in the order it sits in the executable. Point at a cell, or tap it, to see which function it is.</p>
       </div>
       <div class="controls">
-        <div class="seg" role="radiogroup" aria-label="Arrange the cells">
-          <button type="button" role="radio" aria-checked="true" data-mode="addr">Address order</button>
-          <button type="button" role="radio" aria-checked="false" data-mode="area">By part of the game</button>
+        <div class="seg" role="group" aria-label="Arrange the cells">
+          <button type="button" aria-pressed="true" data-mode="addr" disabled>Address order</button>
+          <button type="button" aria-pressed="false" data-mode="area" disabled>By part of the game</button>
         </div>
         <label class="search">
           <span class="sr">Find a function</span>
           <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <input id="q" type="search" placeholder="Find a function, namespace or address" autocomplete="off" spellcheck="false">
+          <input id="q" type="search" placeholder="Find a function or address" autocomplete="off" spellcheck="false" disabled>
         </label>
         <span class="qcount" id="q-count" aria-live="polite"></span>
       </div>
       <ul class="legend" id="legend" aria-label="Highlight one state"></ul>
-      <div class="mapbox" id="mapbox"><p class="loading" id="map-loading">Loading 3,703 functions…</p></div>
-      <p class="inspect" id="inspect" aria-live="polite">Point at a cell to see its function.</p>
+      <div class="mapbox" id="mapbox"><p class="loading" id="map-loading">Loading the map of every function…</p></div>
+      <p class="sr" id="inspect" aria-live="polite"></p>
       <details>
         <summary>Every namespace with functions left, as a table</summary>
         <div class="scroll">
@@ -282,7 +304,7 @@
         <li><span class="k">01</span><h3>Find it</h3><p>Take one function at its address in the 1.41 executable and study it: what calls it, what it calls, which structures it reads and writes.</p><div class="tools"><span>Ghidra</span></div></li>
         <li><span class="k">02</span><h3>Write it</h3><p>Write C++ that a person can read and change, with named types and fields, following the project's style guide.</p><div class="tools"><span>C++</span><span>clang-format</span></div></li>
         <li><span class="k">03</span><h3>Compile it</h3><p>Build it with the compiler whose output matches the original's: Microsoft Visual C++ 2005, Service Pack 1.</p><div class="tools"><span>MSVC 8.0 SP1</span><span>CMake</span></div></li>
-        <li><span class="k">04</span><h3>Compare it</h3><p>reccmp, from the LEGO Island decompilation, lines the new function up against the original instruction by instruction and scores the match.</p><div class="tools"><span>reccmp</span></div></li>
+        <li><span class="k">04</span><h3>Compare it</h3><p>The reccmp tool, from the LEGO Island decompilation, lines the new function up against the original instruction by instruction and scores the match.</p><div class="tools"><span>reccmp</span></div></li>
         <li><span class="k">05</span><h3>Land it</h3><p>At 100% the function is merged into main, and OpenSHC's DLL runs it in the game in place of the original.</p><div class="tools"><span>OpenSHC.dll</span></div></li>
       </ol>
       <div class="lastmile">
@@ -359,10 +381,10 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   // "owner-OpenSHC/branch" in the rollup -> "owner:branch", linked to the branch on GitHub
-  function branchNode(where) {
+  function branchNode(where, branchOnly) {
     const m = /^(.+?)-OpenSHC\/(.+)$/.exec(where || '');
     if (!m) return document.createTextNode(where || '');
-    const a = el('a', null, m[1] + ':' + m[2]);
+    const a = el('a', null, branchOnly ? m[2] : m[1] + ':' + m[2]);
     a.href = 'https://github.com/' + encodeURIComponent(m[1]) + '/OpenSHC/tree/' + m[2].split('/').map(encodeURIComponent).join('/');
     a.title = m[1] + '/OpenSHC, branch ' + m[2];
     return a;
@@ -375,10 +397,17 @@
     return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
   };
   const themeListeners = [];
+  const syncThemeColor = () => {
+    if (!document.documentElement.dataset.theme) return;
+    const c = darkNow() ? '#0f0f0e' : '#fbfaf7';
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', c));
+  };
+  syncThemeColor();
   themeBtn.addEventListener('click', () => {
     const next = darkNow() ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('theme', next); } catch (e) {}
+    syncThemeColor();
     themeListeners.forEach((f) => f());
   });
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => themeListeners.forEach((f) => f()));
@@ -404,7 +433,8 @@
   const FMap = (() => {
     let F, n = 0, box, cv, ctx, W = 0, Hc = 0, dpr = 1, mode = 'addr';
     let cur = null, areaInfo = [], byState = [[], [], [], []], byArea = [];
-    let hover = -1, sel = -1, match = null, matchCount = 0, stateFilter = -1, query = '';
+    let hover = -1, sel = -1, match = null, matchList = null, matchCount = 0, stateFilter = -1, query = '';
+    let backTo = null, pending = null;
     let anim = 0, colors = [];
     let px = null, py = null;  // positions being drawn (animated)
 
@@ -417,7 +447,7 @@
 
     function geometry(w) {
       const compact = w < 600;
-      const pitch = compact ? 6 : w < 900 ? 8 : 10;
+      const pitch = compact ? 7 : w < 900 ? 8 : 10;
       const gap = compact ? 1 : 2;
       return { compact, pitch, gap, size: pitch - gap };
     }
@@ -514,6 +544,7 @@
         ctx.globalAlpha = 1;
       }
       (labelSets || [{ labels: cur.labels, a: 1 }]).forEach((ls) => drawLabels(ls.labels, ls.a));
+      if (!anim && matchList && query.trim() && matchList.length <= 30) for (const i of matchList) if (i !== sel) ring(i, colors[5], 1);
       if (!anim) { ring(sel, colors[4], 2); if (hover !== sel) ring(hover, colors[4], 1.5); }
     }
 
@@ -522,11 +553,12 @@
     function setMode(m) {
       if (m === mode || !F) return;
       mode = m;
-      document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === m)));
+      document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
       syncUrl();
-      const from = cur, to = layout(m);
+      const from = anim ? { x: Float32Array.from(px), y: Float32Array.from(py), labels: [], h: Hc - 4 } : cur, to = layout(m);
       cancelAnimationFrame(anim); anim = 0;
-      if (reduceMotion.matches) { cur = to; sizeCanvas(cur.h); render(); describe(); return; }
+      showTip(-1);
+      if (reduceMotion.matches) { cur = to; sizeCanvas(cur.h); render(); describe(); placeCard(); return; }
       sizeCanvas(Math.max(from.h, to.h));
       const ax = new Float32Array(n), ay = new Float32Array(n);
       px = ax; py = ay;
@@ -545,17 +577,18 @@
         }
         const k = Math.min(1, (now - t0) / (D + spread));
         draw([{ labels: from.labels, a: Math.max(0, 1 - k * 2.2) }, { labels: to.labels, a: Math.max(0, k * 2.2 - 1.2) }]);
-        if (done) { anim = 0; sizeCanvas(to.h); render(); }
+        if (done) { anim = 0; sizeCanvas(to.h); render(); placeCard(); }
         else anim = requestAnimationFrame(step);
       };
       anim = requestAnimationFrame(step);
+      placeCard();
       describe();
     }
 
     function describe() {
       const t = F.totals;
       $('#map-note').textContent = mode === 'addr'
-        ? 'All ' + fmt(n) + ' functions of the game in the order they sit in the executable, from ' + hex(F.rows[0][0]) + ' to ' + hex(F.rows[n - 1][0]) + '. Point at a cell, or tap it, to see which function it is.'
+        ? 'All ' + fmt(n) + ' functions of the game in the order they sit in the executable, from ' + hex(F.rows[0][0]) + ' to ' + hex(F.rows[n - 1][0]) + (cur.compact ? '. Tap a cell to see which function it is, and slide along a row to move between them.' : '. Point at a cell to see its name, and click it for the details.')
         : 'The same ' + fmt(n) + ' functions, grouped by the part of the game they belong to, finished ones first.';
       cv.setAttribute('aria-label', 'Map of all ' + fmt(n) + ' functions, ' + (mode === 'addr' ? 'in address order' : 'grouped by part of the game') +
         ': ' + fmt(t[0]) + ' on main, ' + fmt(t[1]) + ' at 100% on a branch, ' + fmt(t[2]) + ' in progress, ' + fmt(t[3]) + ' not started. Use the arrow keys to move from function to function.');
@@ -576,25 +609,142 @@
       return -1;
     }
 
-    function inspect(i) {
-      const box = $('#inspect');
-      if (i < 0) { box.replaceChildren(document.createTextNode(cur && cur.compact ? 'Tap a cell to see its function.' : 'Point at a cell to see its function. Arrow keys work too.')); return; }
-      const r = F.rows[i];
-      const [addr, , nsI, name, p10, st, srcI] = r;
-      const ns = F.namespaces[nsI];
-      const stEl = el('span', 'st');
+    // the selected function: a card next to its cell, and one line for screen readers
+    let card = null, tipEl = null;
+    const shortState = (r) => (r[5] === 0 ? '100%, on main' : r[5] === 1 ? '100%, waiting to land'
+      : r[5] === 2 ? 'best ' + (r[4] / 10).toFixed(1) + '%' : 'not started');
+
+    function stateNode(r) {
+      const [, , , , p10, st, srcI] = r;
+      const stEl = el('div', 'st');
       stEl.append(el('i', 'sw s' + st));
       if (st === 0) stEl.append(document.createTextNode('100%, on main'));
       else if (st === 1) { stEl.append(document.createTextNode('100% on ')); stEl.append(branchNode(F.sources[srcI])); stEl.append(document.createTextNode(', waiting to land')); }
       else if (st === 2) { stEl.append(document.createTextNode('best ' + (p10 / 10).toFixed(1) + '% on ')); stEl.append(srcI >= 0 ? branchNode(F.sources[srcI]) : document.createTextNode('main')); }
       else stEl.append(document.createTextNode('not started'));
-      box.replaceChildren(el('span', 'addr', hex(addr)), el('span', 'fn', (ns ? ns + '::' : '') + name), stEl);
+      return stEl;
     }
 
-    function applyFilter() {
+    function makeCard() {
+      card = el('div', 'fcard');
+      card.hidden = true;
+      card.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { select(-1); cv.focus({ preventScroll: true }); } });
+      tipEl = el('div', 'tip');
+      tipEl.hidden = true;
+      tipEl.setAttribute('aria-hidden', 'true');
+      box.append(card, tipEl);
+    }
+
+    function fillCard(i) {
+      const box2 = $('#inspect');
+      if (i < 0) { card.hidden = true; box2.textContent = ''; return; }
+      const r = F.rows[i];
+      const ns = F.namespaces[r[2]];
+      // previous and next function (in the order shown, among the matches when searching), and close
+      const btn = (cls, label, path, fn) => {
+        const b = el('button', 'x ' + cls);
+        b.type = 'button'; b.setAttribute('aria-label', label); b.title = label;
+        b.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="' + path + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        b.addEventListener('click', fn);
+        return b;
+      };
+      const acts = el('div', 'acts');
+      acts.append(
+        btn('pv', 'Previous function', 'M7.5 2.5 4 6l3.5 3.5', () => stepSel(-1, '.pv')),
+        btn('nx', 'Next function', 'M4.5 2.5 8 6l-3.5 3.5', () => stepSel(1, '.nx')),
+        btn('cl', 'Close', 'M2.5 2.5l7 7M9.5 2.5l-7 7', () => { select(-1); cv.focus({ preventScroll: true }); }));
+      const top = el('div', 'top');
+      top.append(el('span', null, hex(r[0])), acts);
+      // long names break after :: and _ before they break inside a word
+      const breakable = (node, text, re) => text.split(re).forEach((part, k, all) => {
+        node.append(document.createTextNode(part));
+        if (k < all.length - 1) node.append(el('wbr'));
+      });
+      const fn = el('div', 'fn');
+      if (ns) { const nsEl = el('span'); breakable(nsEl, ns + '::', /(?<=::)/); fn.append(nsEl, el('wbr')); }
+      breakable(fn, r[3], /(?<=_)/);
+      card.replaceChildren(top, fn, stateNode(r));
+      if (backTo) {
+        const back = el('button', 'back', 'Back to the list ↓');
+        back.type = 'button';
+        const to = backTo;
+        back.addEventListener('click', () => {
+          window.scrollTo({ top: to.y, behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+          if (to.el) to.el.focus({ preventScroll: true });
+        });
+        card.append(back);
+      }
+      box2.textContent = (ns ? ns + '::' : '') + r[3] + ', at ' + hex(r[0]) + ': ' + shortState(r) + '.';
+    }
+
+    // above the cell, or below it near the top of the map; kept inside the map's width
+    function place(node, i, gap) {
+      const s = cur.size, cx = cur.x[i] + s / 2, cy = cur.y[i];
+      const w = node.offsetWidth, h = node.offsetHeight;
+      node.style.left = Math.max(0, Math.min(W - w, cx - w / 2)) + 'px';
+      node.style.top = (cy - h - gap >= 0 ? cy - h - gap : cy + s + gap) + 'px';
+    }
+
+    function placeCard() {
+      if (!card) return;
+      card.hidden = sel < 0 || !cur || !!anim;
+      if (!card.hidden) place(card, sel, 10);
+    }
+
+    function showTip(i) {
+      if (i < 0 || i === sel || anim) { tipEl.hidden = true; return; }
+      const r = F.rows[i];
+      tipEl.replaceChildren(el('b', null, r[3]), el('br'), document.createTextNode(hex(r[0]) + ' · ' + shortState(r)));
+      tipEl.hidden = false;
+      place(tipEl, i, 8);
+    }
+
+    // a function's place in the order the cells are shown
+    const rank = (i) => (mode === 'area' ? orderOf[i] : i);
+
+    function updateCount() {
+      const c = $('#q-count');
+      if (!query.trim() || !match) { c.textContent = ''; return; }
+      if (!matchCount) { c.textContent = 'No function matches'; return; }
+      if (matchCount === 1) { c.textContent = '1 function'; return; }
+      if (sel >= 0 && match[sel]) {
+        const r = rank(sel);
+        let pos = 1;
+        for (const i of matchList) if (rank(i) < r) pos++;
+        c.textContent = pos + ' of ' + fmt(matchCount) + ' · Enter for next';
+      } else c.textContent = fmt(matchCount) + ' functions · Enter to step through';
+    }
+
+    // the next match after the selected function in the order shown, wrapping around
+    function nextMatch(dir) {
+      if (!matchList || !matchList.length) return -1;
+      const r0 = sel >= 0 && match[sel] ? rank(sel) : (dir > 0 ? -1 : Infinity);
+      let best = -1, bestR = dir > 0 ? Infinity : -Infinity, wrap = -1, wrapR = dir > 0 ? Infinity : -Infinity;
+      for (const i of matchList) {
+        const r = rank(i);
+        if (dir > 0) { if (r > r0 && r < bestR) { best = i; bestR = r; } if (r < wrapR) { wrap = i; wrapR = r; } }
+        else { if (r < r0 && r > bestR) { best = i; bestR = r; } if (r > wrapR) { wrap = i; wrapR = r; } }
+      }
+      return best >= 0 ? best : wrap;
+    }
+
+    function stepSel(dir, focusSel) {
+      if (sel < 0) return;
+      for (let k = rank(sel) + dir; k >= 0 && k < n; k += dir) {
+        const i = mode === 'area' ? displayOrder[k] : k;
+        if (!match || match[i]) {
+          select(i, false, { back: backTo });
+          const b = card.querySelector(focusSel);
+          if (b) b.focus({ preventScroll: true });
+          return;
+        }
+      }
+    }
+
+    function applyFilter(fromTyping) {
       const q = query.trim().toLowerCase();
-      if (!q && stateFilter < 0) { match = null; $('#q-count').textContent = ''; render(); return; }
-      match = new Uint8Array(n); matchCount = 0;
+      if (!q && stateFilter < 0) { match = null; matchList = null; updateCount(); render(); return; }
+      match = new Uint8Array(n); matchCount = 0; matchList = [];
       const hexQ = /^(0x)?0*[0-9a-f]{3,8}$/.test(q) ? q.replace(/^0x/, '').replace(/^0+/, '') : null;
       for (let i = 0; i < n; i++) {
         const r = F.rows[i];
@@ -603,10 +753,10 @@
           const full = (F.namespaces[r[2]] + '::' + r[3]).toLowerCase();
           if (!(full.includes(q) || (hexQ && r[0].toString(16).includes(hexQ)))) continue;
         }
-        match[i] = 1; matchCount++;
+        match[i] = 1; matchCount++; matchList.push(i);
       }
-      $('#q-count').textContent = q ? (matchCount === 1 ? '1 function' : fmt(matchCount) + ' functions') : '';
-      render();
+      if (fromTyping && q && matchCount === 1 && sel !== matchList[0]) select(matchList[0]);
+      else { updateCount(); render(); }
     }
 
     // the view and the selected function live in the URL, so a link can point at one function
@@ -619,12 +769,25 @@
       } catch (e) {}
     }
 
-    function select(i, scroll) {
-      sel = i; inspect(i); render(); syncUrl();
-      if (scroll) {
+    // opts.back: where a jump from the list came from; opts.quiet: no scrolling (a finger sliding along a row)
+    function select(i, scroll, opts) {
+      opts = opts || {};
+      sel = i; backTo = i >= 0 && opts.back ? opts.back : null;
+      fillCard(i); render(); syncUrl(); placeCard(); updateCount();
+      if (i === hover) showTip(-1);
+      if (i < 0 || opts.quiet) return;
+      const behavior = reduceMotion.matches ? 'auto' : 'smooth';
+      if (scroll) {  // centre the cell and its card on the screen
         const r = cv.getBoundingClientRect();
-        const y = window.scrollY + r.top + cur.y[i] - window.innerHeight / 2;
-        window.scrollTo({ top: Math.max(0, y), behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+        let a = r.top + cur.y[i], b = a + cur.size;
+        if (!card.hidden) { const c = card.getBoundingClientRect(); a = Math.min(a, c.top); b = Math.max(b, c.bottom); }
+        window.scrollTo({ top: Math.max(0, window.scrollY + (a + b) / 2 - window.innerHeight / 2), behavior });
+      } else {  // scroll only as far as it takes to show the cell and its card
+        const r = cv.getBoundingClientRect();
+        let a = r.top + cur.y[i] - 8, b = r.top + cur.y[i] + cur.size + 8;
+        if (!card.hidden) { const c = card.getBoundingClientRect(); a = Math.min(a, c.top - 8); b = Math.max(b, c.bottom + 8); }
+        const dy = a < 0 ? a : b > window.innerHeight ? Math.min(b - window.innerHeight, a) : 0;
+        if (dy) window.scrollBy({ top: dy, behavior });
       }
     }
 
@@ -666,27 +829,44 @@
       $('#map-loading').remove();
       cv = document.createElement('canvas');
       cv.tabIndex = 0;
-      cv.setAttribute('role', 'img');
+      cv.setAttribute('role', 'application');
       box.append(cv);
       ctx = cv.getContext('2d');
       readColors();
       const params = new URLSearchParams(window.location.search);
       if (params.get('view') === 'parts') {
         mode = 'area';
-        document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+        document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
       }
-      W = box.clientWidth; cur = layout(mode); sizeCanvas(cur.h); render(); describe(); inspect(-1);
+      W = box.clientWidth; cur = layout(mode); sizeCanvas(cur.h); render(); describe();
+      makeCard();
       box.style.minHeight = '0';
       const want = parseInt((params.get('fn') || '').replace(/^0x/i, ''), 16);
-      if (want) { const i = F.rows.findIndex((r) => r[0] === want); if (i >= 0) select(i, true); }
+      if (want) {
+        const i = F.rows.findIndex((r) => r[0] === want);
+        if (i >= 0) {
+          // a link to one function: scroll to it once the fonts have settled the layout, not to where a reload was
+          if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+          (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => select(i, true));
+        }
+      }
 
+      // a finger sliding sideways along a row moves the selection (a vertical drag scrolls the page instead)
+      let touchId = -1;
+      cv.addEventListener('pointerdown', (ev) => { if (ev.pointerType === 'touch') touchId = ev.pointerId; });
+      const endTouch = (ev) => { if (ev.pointerId === touchId) touchId = -1; };
+      cv.addEventListener('pointerup', endTouch);
+      cv.addEventListener('pointercancel', endTouch);
       cv.addEventListener('pointermove', (ev) => {
-        if (ev.pointerType === 'touch') return;
         const r = cv.getBoundingClientRect();
         const i = hit(ev.clientX - r.left, ev.clientY - r.top);
-        if (i !== hover) { hover = i; inspect(i >= 0 ? i : sel); render(); }
+        if (ev.pointerType === 'touch') {
+          if (ev.pointerId === touchId && i >= 0 && i !== sel) select(i, false, { quiet: true });
+          return;
+        }
+        if (i !== hover) { hover = i; showTip(i); render(); }
       });
-      cv.addEventListener('pointerleave', () => { if (hover >= 0) { hover = -1; inspect(sel); render(); } });
+      cv.addEventListener('pointerleave', () => { if (hover >= 0) { hover = -1; showTip(-1); render(); } });
       cv.addEventListener('click', (ev) => {
         const r = cv.getBoundingClientRect();
         const i = hit(ev.clientX - r.left, ev.clientY - r.top);
@@ -700,11 +880,21 @@
       document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
       const q = $('#q');
       let qt = 0;
-      q.addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { query = q.value; applyFilter(); }, 90); });
+      q.addEventListener('input', () => { clearTimeout(qt); qt = setTimeout(() => { query = q.value; applyFilter(true); }, 90); });
       q.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter' && match) { const i = match.indexOf(1); if (i >= 0) select(i, true); }
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          clearTimeout(qt);
+          if (query !== q.value) { query = q.value; applyFilter(); }
+          const i = nextMatch(ev.shiftKey ? -1 : 1);
+          if (i >= 0) select(i, true);
+        }
         if (ev.key === 'Escape') { q.value = ''; query = ''; applyFilter(); }
       });
+      // the controls work from here on; anything typed before the map loaded counts
+      document.querySelectorAll('.seg button').forEach((b) => { b.disabled = false; });
+      q.disabled = false;
+      if (q.value) { query = q.value; applyFilter(); }
 
       // legend: each state is a toggle that highlights its cells
       const lg = $('#legend');
@@ -713,7 +903,8 @@
         const b = el('button');
         b.type = 'button';
         b.setAttribute('aria-pressed', 'false');
-        b.append(el('i', 'sw s' + st), document.createTextNode(STATE_LONG[st] + ' '), el('b', null, fmt(F.totals[st])), el('span', 'pp', share(F.totals[st], n) + '%'));
+        b.append(el('i', 'sw s' + st), el('span', 'long', STATE_LONG[st]), el('span', 'short', st === 1 ? '100% on a branch' : STATE_LONG[st]),
+          el('b', null, fmt(F.totals[st])), el('span', 'pp', share(F.totals[st], n) + '%'));
         b.addEventListener('click', () => {
           stateFilter = stateFilter === st ? -1 : st;
           lg.querySelectorAll('button').forEach((x, k) => x.setAttribute('aria-pressed', String(k === stateFilter)));
@@ -728,16 +919,18 @@
         if (w === lastW) return;
         lastW = W = w;
         cancelAnimationFrame(anim); anim = 0;
-        cur = layout(mode); sizeCanvas(cur.h); render();
+        cur = layout(mode); sizeCanvas(cur.h); render(); placeCard(); showTip(-1); describe();
       });
       themeListeners.push(() => { readColors(); render(); });
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
+      if (pending) { const [a, b] = pending; pending = null; selectAddress(a, b); }
     }
 
-    function selectAddress(addr) {
-      if (!F) return;
+    // from the lists below: back is where the visitor was, for the card's "Back to the list"
+    function selectAddress(addr, back) {
+      if (!F) { pending = [addr, back]; return; }
       const i = F.rows.findIndex((r) => r[0] === addr);
-      if (i >= 0) { select(i, true); cv.focus({ preventScroll: true }); }
+      if (i >= 0) { select(i, true, { back }); cv.focus({ preventScroll: true }); }
     }
 
     return { init, selectAddress };
@@ -778,7 +971,10 @@
     $('#hist-note').textContent = note;
 
     const W = Math.max(box.clientWidth, 280), compact = W < 600;
-    const H = compact ? 250 : 320, mt = 18, mb = 30, mr = compact ? 12 : 168;
+    const labMain = fmt(last.v) + ' on main', labBranch = '+' + fmt(t.branch_100) + ' at 100% on branches';
+    // IBM Plex Mono advances 0.6 em per character, at 13 px and 12 px
+    const mr = compact ? 12 : 22 + Math.ceil(Math.max(labMain.length * 13, labBranch.length * 12) * 0.6) + 4;
+    const H = compact ? 250 : 320, mt = 18, mb = 30;
     const yMax = t.total;
     const step = yMax > 6000 ? 2000 : 1000;
     const ticks = [];
@@ -823,8 +1019,9 @@
     svg.append(sv('rect', { x: ex + 8, y: y(last.v + t.branch_100), width: 5, height: Math.max(1, y(last.v) - y(last.v + t.branch_100) - 2), rx: 2, fill: 'var(--c-branch)' }));
     svg.append(sv('circle', { cx: ex, cy: y(last.v), r: 4.5, fill: 'var(--c-main)', stroke: 'var(--bg)', 'stroke-width': 2 }));
     if (!compact) {
-      const a = sv('text', { x: ex + 22, y: y(last.v) + 4, class: 'lab-strong' }); a.textContent = fmt(last.v) + ' on main'; svg.append(a);
-      const b = sv('text', { x: ex + 22, y: y(last.v + t.branch_100 / 2) + 4, class: 'lab' }); b.textContent = '+' + fmt(t.branch_100) + ' at 100% on branches'; svg.append(b);
+      const ya = y(last.v) + 4, yb = Math.min(y(last.v + t.branch_100 / 2) + 4, ya - 17);
+      const a = sv('text', { x: ex + 22, y: ya, class: 'lab-strong' }); a.textContent = labMain; svg.append(a);
+      const b = sv('text', { x: ex + 22, y: yb, class: 'lab' }); b.textContent = labBranch; svg.append(b);
     }
     // hover: a crosshair and the count on that day
     const cross = sv('line', { y1: mt, y2: y(0), stroke: 'var(--ink-3)', visibility: 'hidden' });
@@ -853,10 +1050,15 @@
       const tx = Math.min(Math.max(cx + 12, 0), W - tip.offsetWidth);
       tip.style.left = tx + 'px'; tip.style.top = Math.max(0, y(pts[k].v) - 44) + 'px';
     };
+    const hide = () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
     hitRect.addEventListener('pointermove', show);
     hitRect.addEventListener('pointerdown', show);
-    hitRect.addEventListener('pointerleave', () => { tip.hidden = true; cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); });
+    // a finger lifting fires pointerleave: keep the value until the next tap outside the chart
+    hitRect.addEventListener('pointerleave', (ev) => { if (ev.pointerType !== 'touch') hide(); });
+    histHide = hide;
   }
+  let histHide = null;
+  document.addEventListener('pointerdown', (ev) => { if (histHide && !(ev.target.closest && ev.target.closest('#hist-chart'))) histHide(); });
 
   // ---------------------------------------------------------------- near misses, bands, waiting
   function nearItem(r) {
@@ -866,7 +1068,10 @@
     const b = el('button', null, r.function);
     b.type = 'button';
     b.title = 'Show ' + r.function + ' on the map';
-    b.addEventListener('click', () => FMap.selectAddress(parseInt(r.address, 16)));
+    const go = el('span', 'go', 'map ↑');
+    go.setAttribute('aria-hidden', 'true');
+    b.append(go);
+    b.addEventListener('click', () => FMap.selectAddress(parseInt(r.address, 16), { y: window.scrollY, el: b }));
     fn.append(b);
     li.append(fn);
     const wh = el('span', 'wh');
@@ -908,18 +1113,20 @@
     shown.forEach((r) => {
       const row = el('div', 'wrow');
       const cell = el('span');
-      cell.append(branchNode(r.where));
+      cell.append(branchNode(r.where, true));
       row.append(cell, el('span', 'v', fmt(r.functions)));
       w.append(row);
     });
   }
 
   // ---------------------------------------------------------------- load
+  let numbersOk = false;
   fetch('data/progress.json', { cache: 'no-cache' }).then((r) => {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
   }).then((d) => {
     drawNumbers(d); drawTable(d); drawHistory(d); drawLists(d);
+    numbersOk = true;
     let w = window.innerWidth;
     window.addEventListener('resize', () => { if (window.innerWidth !== w) { w = window.innerWidth; drawHistory(d); } });
     return fetch('data/functions.json', { cache: 'no-cache' }).then((r) => {
@@ -928,7 +1135,7 @@
     }).then((f) => FMap.init(f, d));
   }).catch((e) => {
     const l = $('#map-loading');
-    if (l) l.textContent = 'The numbers failed to load (' + e.message + '). Try again in a minute.';
+    if (l) l.textContent = (numbersOk ? 'The map failed to load (' : 'The numbers failed to load (') + e.message + '). Try again in a minute.';
   });
 })();
 </script>
