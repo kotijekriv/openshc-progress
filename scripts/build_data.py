@@ -1,9 +1,12 @@
-"""Build site/data/progress.json from OpenSHC's public data.
+"""Build site/data/progress.json and site/data/functions.json from OpenSHC's public data.
 
 Sources, all public:
 - status_rollup.tsv from sourcehold/OpenSHC's latest-sarif release: every function of the game with its best match on
   main or on the branches the project's rollup knows (the same file tools/pick_work.py reads);
 - a clone of sourcehold/OpenSHC: main's status/addresses-SHC-3BB0A8C1.txt and its git history.
+
+progress.json holds the totals, parts of the game, namespaces, history and lists; functions.json holds one row per
+function in address order, for the page's map of the executable.
 
 usage: python scripts/build_data.py --openshc PATH [--ref REF] [--out site/data] [--rollup FILE]
 """
@@ -26,6 +29,7 @@ AREA_NAMES = {
     'Input': 'Mouse and keyboard', 'Util': 'Utilities', 'Random': 'Random numbers',
 }
 BANDS = ['95 to 99.9%', '90 to 95%', '75 to 90%', '50 to 75%', '25 to 50%', 'under 25%', 'not started']
+STATES = ['on_main', 'branch_100', 'in_progress', 'not_started']
 
 
 def git(repo, *args):
@@ -107,12 +111,16 @@ def main():
     areas, namespaces = collections.OrderedDict(), {}
     bands = collections.Counter()
     almost, waiting_by = [], collections.Counter()
+    fn_rows = []
     for r in rollup:
         addr = addr_of(r['address'])
         pct = float(r['best_pct'] or 0)
         state = ('on_main' if addr in main100 else 'branch_100' if pct >= 100 else
                  'in_progress' if pct > 0 else 'not_started')
         key = area_of(r['expected_cpp'])
+        fn_rows.append((int(addr, 16), key, namespace_of(r['expected_cpp']),
+                        os.path.splitext(os.path.basename(r['expected_cpp']))[0], pct, state,
+                        r['best_source'] if state in ('branch_100', 'in_progress') else ''))
         for table, k, extra in ((areas, key, {'key': key, 'area': AREA_NAMES.get(key, key)}),
                                 (namespaces, namespace_of(r['expected_cpp']), {'namespace': namespace_of(r['expected_cpp'])})):
             row = table.setdefault(k, dict(extra, on_main=0, branch_100=0, in_progress=0, not_started=0, total=0))
@@ -149,9 +157,28 @@ def main():
         'almost': sorted(almost, key=lambda r: -r['best_pct']),
         'waiting': [{'where': k, 'functions': v} for k, v in waiting_by.most_common(12)],
     }
+    # one row per function, in address order: [address, area, namespace, name, best % x10, state, source]
+    # area, namespace, state and source are indexes into the lists next to the rows, to keep the file small
+    fn_rows.sort()
+    area_keys = [r['key'] for r in data['areas']]
+    ns_list = sorted({row[2] for row in fn_rows})
+    src_list = sorted({row[6] for row in fn_rows if row[6]})
+    ns_ix = {n: i for i, n in enumerate(ns_list)}
+    src_ix = {s: i for i, s in enumerate(src_list)}
+    functions = {
+        'generated_at': data['generated_at'],
+        'columns': ['address', 'area', 'namespace', 'name', 'best_pct_x10', 'state', 'source'],
+        'states': STATES, 'areas': area_keys, 'namespaces': ns_list, 'sources': src_list,
+        'rows': [[addr, area_keys.index(area), ns_ix[ns], name, int(round(pct * 10)), STATES.index(state),
+                  src_ix[src] if src else -1]
+                 for addr, area, ns, name, pct, state, src in fn_rows],
+    }
+
     os.makedirs(a.out, exist_ok=True)
     json.dump(data, open(os.path.join(a.out, 'progress.json'), 'w', encoding='utf-8', newline='\n'),
               ensure_ascii=False, indent=1)
+    with open(os.path.join(a.out, 'functions.json'), 'w', encoding='utf-8', newline='\n') as f:
+        json.dump(functions, f, ensure_ascii=False, separators=(',', ':'))
     t = data['totals']
     print('functions %d, on main %d (%.1f%%), 100%% on a branch %d, in progress %d, not started %d; history %d days'
           % (total, on_main, 100.0 * on_main / total, t['branch_100'], t['in_progress'], t['not_started'], len(history)))
