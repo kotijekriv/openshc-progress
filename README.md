@@ -8,11 +8,11 @@ machine code as the game's 1.41 executable. The page shows:
 
 - the share of the game's functions done on main, how many more already match 100% on a branch, and the last 7 days;
 - **a map of the whole game**: one cell per function, all 3,703, in the order they sit in the executable, coloured by
-  where each stands. Clicking or tapping a cell opens a card next to it with the function's name, its best match and
-  the branch holding it, with buttons to step to the previous and next function; on a phone a finger sliding along a
-  row moves the selection. The map can be regrouped by part of the game (animated), searched by name, namespace or
-  address (Enter steps through the matches), walked with the arrow keys, and linked to: `?fn=0x0053BC20` selects a
-  function, `?view=parts` opens the grouped view;
+  where each stands. Clicking or tapping a cell opens a card next to it with the function's name, its best match, the
+  branch holding it and a link to its code on GitHub (on main, or on that branch), with buttons to step to the
+  previous and next function; on a phone a finger sliding along a row moves the selection. The map can be regrouped
+  by part of the game (animated), searched by name, namespace or address (Enter steps through the matches), walked
+  with the arrow keys, and linked to: `?fn=0x0053BC20` selects a function, `?view=parts` opens the grouped view;
 - functions on main over time, against the goal of every function, with what is waiting on branches on top;
 - how a function gets to 100% (Ghidra, C++, MSVC 2005 SP1, reccmp, the DLL), and what the last few percent are;
 - the unfinished functions closest to 100%, how close the rest are, and the branches holding finished work.
@@ -29,6 +29,9 @@ All public, nothing else:
   finished work than the page shows.
 - OpenSHC's main branch: `status/addresses-SHC-3BB0A8C1.txt` and its git history, for what is on main now and
   how that grew.
+- For the map's links to the code: each function's reccmp annotation (`// FUNCTION: STRONGHOLDCRUSADER 0x…`) on
+  main, and, with `--fetch-branches`, on the branches the rollup names. The script fetches those into
+  `refs/progress/` in the OpenSHC clone, so point it at a clone of its own.
 
 `scripts/build_data.py` (Python standard library only) turns them into `site/data/progress.json` (totals, parts of the
 game, namespaces, history, lists) and `site/data/functions.json` (one row per function in address order, for the map).
@@ -61,8 +64,8 @@ GitHub pauses scheduled workflows in a repository with no activity for 60 days; 
 ## Run it locally
 
 ```bash
-git clone https://github.com/sourcehold/OpenSHC.git ../OpenSHC
-python scripts/build_data.py --openshc ../OpenSHC --out site/data
+git clone --single-branch --branch main https://github.com/sourcehold/OpenSHC.git ../openshc-for-progress
+python scripts/build_data.py --openshc ../openshc-for-progress --out site/data --fetch-branches
 pip install matplotlib==3.9.2 && python scripts/make_card.py
 python -m http.server 8000 --directory site
 ```

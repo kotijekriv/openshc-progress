@@ -3,12 +3,15 @@
 Sources, all public:
 - status_rollup.tsv from sourcehold/OpenSHC's latest-sarif release: every function of the game with its best match on
   main or on the branches the project's rollup knows (the same file tools/pick_work.py reads);
-- a clone of sourcehold/OpenSHC: main's status/addresses-SHC-3BB0A8C1.txt and its git history.
+- a clone of sourcehold/OpenSHC: main's status/addresses-SHC-3BB0A8C1.txt and its git history, and where each
+  function's code is (its reccmp annotation, "// FUNCTION: STRONGHOLDCRUSADER 0x..."), for the map's link to it;
+- with --fetch-branches, the branches the rollup names (fetched into refs/progress/ in that clone), for the same link
+  to the code of functions that are only on a branch.
 
 progress.json holds the totals, parts of the game, namespaces, history and lists; functions.json holds one row per
 function in address order, for the page's map of the executable.
 
-usage: python scripts/build_data.py --openshc PATH [--ref REF] [--out site/data] [--rollup FILE]
+usage: python scripts/build_data.py --openshc PATH [--ref REF] [--out site/data] [--rollup FILE] [--fetch-branches]
 """
 import argparse
 import collections
@@ -17,6 +20,7 @@ import datetime
 import io
 import json
 import os
+import re
 import subprocess
 import urllib.request
 
@@ -30,6 +34,8 @@ AREA_NAMES = {
 }
 BANDS = ['95 to 99.9%', '90 to 95%', '75 to 90%', '50 to 75%', '25 to 50%', 'under 25%', 'not started']
 STATES = ['on_main', 'branch_100', 'in_progress', 'not_started']
+ANNOTATION = r'// *(FUNCTION|STUB): *STRONGHOLDCRUSADER 0x[0-9a-fA-F]+'
+BRANCH = re.compile(r'^(.+?)-OpenSHC/(.+)$')  # the rollup's "<owner>-OpenSHC/<branch>", as the page reads it
 
 
 def git(repo, *args):
@@ -47,6 +53,40 @@ def http_get(url):
 
 def addr_of(text):
     return text.strip().lower().split('0x')[-1].lstrip('0') or '0'
+
+
+def code_in(repo, ref):
+    """address -> (file, line) of each function's annotation under src/ at ref"""
+    r = subprocess.run(['git', '-C', repo, 'grep', '-n', '-I', '-E', ANNOTATION, ref, '--', 'src'],
+                       capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if r.returncode > 1:
+        raise SystemExit('git grep ' + ref + ': ' + r.stderr[:300])
+    found = {}
+    for line in r.stdout.splitlines():
+        _, path, num, text = line.split(':', 3)
+        found.setdefault(addr_of(re.search(r'0x[0-9a-fA-F]+', text).group(0)), (path, int(num)))
+    return found
+
+
+def fetch_branches(repo, sources):
+    """fetch the rollup's branches that still exist into refs/progress/; returns source -> ref"""
+    by_owner = collections.defaultdict(list)
+    for s in sources:
+        m = BRANCH.match(s)
+        if m:
+            by_owner[m.group(1)].append((s, m.group(2)))
+    refs = {}
+    for owner, items in sorted(by_owner.items()):
+        url = 'https://github.com/' + owner + '/OpenSHC.git'
+        r = subprocess.run(['git', 'ls-remote', '--heads', url], capture_output=True, text=True)
+        heads = {line.split('refs/heads/', 1)[1] for line in r.stdout.splitlines() if 'refs/heads/' in line}
+        mine = {s: 'refs/progress/' + owner + '/' + b for s, b in items if b in heads}
+        specs = ['+refs/heads/' + b + ':' + mine[s] for s, b in items if s in mine]
+        if specs and subprocess.run(['git', '-C', repo, 'fetch', '--quiet', '--no-tags', url, *specs]).returncode == 0:
+            refs.update(mine)
+        else:
+            print('no code links for', owner + "'s branches")
+    return refs
 
 
 def area_of(cpp):
@@ -74,6 +114,8 @@ def main():
     ap.add_argument('--ref', default='HEAD')
     ap.add_argument('--out', default='site/data')
     ap.add_argument('--rollup', help='a local status_rollup.tsv instead of the release asset')
+    ap.add_argument('--fetch-branches', action='store_true',
+                    help="fetch the rollup's branches into the clone, to link to the code of functions only on a branch")
     a = ap.parse_args()
 
     rollup_text = open(a.rollup, encoding='utf-8').read() if a.rollup else http_get(ROLLUP_URL)
@@ -160,6 +202,19 @@ def main():
     # one row per function, in address order: [address, area, namespace, name, best % x10, state, source]
     # area, namespace, state and source are indexes into the lists next to the rows, to keep the file small
     fn_rows.sort()
+    # where each function's code is, in its best source: main's file, or the branch's
+    code = {'main': code_in(a.openshc, a.ref)}
+    if a.fetch_branches:
+        for s, ref in fetch_branches(a.openshc, {row[6] for row in fn_rows if row[6] not in ('', 'main')}).items():
+            code[s] = code_in(a.openshc, ref)
+
+    def code_of(addr, ns, name, src):
+        at = code.get(src or 'main', {}).get(addr_of(hex(addr)))
+        if not at:
+            return 0
+        # the page builds the usual path from the namespace and the name; spell out only a file somewhere else
+        return at[1] if at[0] == 'src/OpenSHC/' + ns.replace('::', '/') + '/' + name + '.cpp' else list(at)
+
     area_keys = [r['key'] for r in data['areas']]
     ns_list = sorted({row[2] for row in fn_rows})
     src_list = sorted({row[6] for row in fn_rows if row[6]})
@@ -167,10 +222,12 @@ def main():
     src_ix = {s: i for i, s in enumerate(src_list)}
     functions = {
         'generated_at': data['generated_at'],
-        'columns': ['address', 'area', 'namespace', 'name', 'best_pct_x10', 'state', 'source'],
+        # code: the line of the function's annotation in src/OpenSHC/<namespace>/<name>.cpp, or [file, line] for a
+        # file elsewhere, or 0 when there is none; in main's code, or the source branch's for a function not on main
+        'columns': ['address', 'area', 'namespace', 'name', 'best_pct_x10', 'state', 'source', 'code'],
         'states': STATES, 'areas': area_keys, 'namespaces': ns_list, 'sources': src_list,
         'rows': [[addr, area_keys.index(area), ns_ix[ns], name, int(round(pct * 10)), STATES.index(state),
-                  src_ix[src] if src else -1]
+                  src_ix[src] if src else -1, code_of(addr, ns, name, src)]
                  for addr, area, ns, name, pct, state, src in fn_rows],
     }
 
@@ -182,6 +239,7 @@ def main():
     t = data['totals']
     print('functions %d, on main %d (%.1f%%), 100%% on a branch %d, in progress %d, not started %d; history %d days'
           % (total, on_main, 100.0 * on_main / total, t['branch_100'], t['in_progress'], t['not_started'], len(history)))
+    print('code found for %d functions' % sum(1 for row in functions['rows'] if row[7]))
 
 
 if __name__ == '__main__':
