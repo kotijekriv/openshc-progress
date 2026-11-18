@@ -1,8 +1,9 @@
 """Build site/data/progress.json and site/data/functions.json from OpenSHC's public data.
 
 Sources, all public:
-- status_rollup.tsv from sourcehold/OpenSHC's latest-sarif release: every function of the game with its best match on
-  main or on the branches the project's rollup knows (the same file tools/pick_work.py reads);
+- status_rollup.tsv from sourcehold/OpenSHC's latest-sarif release: every function OpenSHC has mapped so far (declared
+  with a resolver; Ghidra finds about 4,570 in the executable) with its best match on main or on the branches the
+  project's rollup knows (the same file tools/pick_work.py reads);
 - a clone of sourcehold/OpenSHC: main's status/addresses-SHC-3BB0A8C1.txt and its git history, and where each
   function's code is (its reccmp annotation, "// FUNCTION: STRONGHOLDCRUSADER 0x..."), for the map's link to it;
 - with --fetch-branches, the branches the rollup names (fetched into refs/progress/ in that clone), for the same link

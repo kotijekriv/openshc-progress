@@ -247,11 +247,11 @@
         <h1 id="title">Stronghold Crusader, rewritten in C++ one function at a time.</h1>
         <p class="lede"><a href="https://github.com/sourcehold/OpenSHC">OpenSHC</a> is the community's rewrite of the 2002 castle game. A function counts as done only when Microsoft Visual C++ 2005 compiles the new source to <b>the same machine code as the game's own executable</b>, checked instruction by instruction. Done functions are merged into main, the project's official code, and already run in the game: OpenSHC's DLL hooks them in place of the originals.</p>
       </div>
-      <div class="figure" role="group" aria-label="Share of the game's functions done and merged into main">
+      <div class="figure" role="group" aria-label="Share of the functions OpenSHC has mapped so far that are done and merged into main">
         <div class="big"><span data-k="pct">–</span><span class="pc">%</span></div>
         <div class="meter" aria-hidden="true"><i class="m" id="meter-m" style="width:0"></i><i class="b" id="meter-b" style="width:0"></i></div>
         <p class="figcap">
-          <span><b data-k="on_main">–</b> of <b data-k="total">–</b> functions merged into main</span>
+          <span><b data-k="on_main">–</b> of <b data-k="total">–</b> mapped functions on main</span>
           <span><b data-k="week">–</b> in the last 7 days</span>
           <span><b data-k="branch_100">–</b> more at 100% on branches</span>
         </p>
@@ -260,8 +260,8 @@
 
     <section class="sec" id="map" aria-labelledby="map-h">
       <div class="sec-head">
-        <h2 id="map-h">The whole game, one cell per function</h2>
-        <p class="note" id="map-note">Every function of the game in the order it sits in the executable. Point at a cell, or tap it, to see which function it is.</p>
+        <h2 id="map-h">Every function mapped so far, one cell each</h2>
+        <p class="note" id="map-note">Every function OpenSHC has mapped so far, in the order it sits in the executable. Point at a cell, or tap it, to see which function it is.</p>
       </div>
       <div class="controls">
         <div class="seg" role="group" aria-label="Arrange the cells">
@@ -276,7 +276,7 @@
         <span class="qcount" id="q-count" aria-live="polite"></span>
       </div>
       <ul class="legend" id="legend" aria-label="Highlight one state"></ul>
-      <div class="mapbox" id="mapbox"><p class="loading" id="map-loading">Loading the map of every function…</p></div>
+      <div class="mapbox" id="mapbox"><p class="loading" id="map-loading">Loading the map…</p></div>
       <p class="sr" id="inspect" aria-live="polite"></p>
       <details>
         <summary>Every namespace with functions left, as a table</summary>
@@ -350,7 +350,7 @@
   <footer class="foot">
     <div>
       <h2>Where the numbers come from</h2>
-      <p>Only OpenSHC's public data: <code>status_rollup.tsv</code> from its <a href="https://github.com/sourcehold/OpenSHC/releases/tag/latest-sarif">latest-sarif release</a>, which lists every function with its best match on main or on the branches the project tracks, and main's <code>status/addresses-SHC-3BB0A8C1.txt</code> with its git history. Forks the rollup doesn't track can hold more finished work than this page shows.</p>
+      <p>Only OpenSHC's public data: <code>status_rollup.tsv</code> from its <a href="https://github.com/sourcehold/OpenSHC/releases/tag/latest-sarif">latest-sarif release</a>, which lists every function OpenSHC has mapped so far (declared at its address, with a resolver) with its best match on main or on the branches the project tracks, and main's <code>status/addresses-SHC-3BB0A8C1.txt</code> with its git history. Forks the rollup doesn't track can hold more finished work than this page shows. For scale, from outside that data: Ghidra finds about 4,570 functions in the 1.41 executable, so about 860 aren't on the list yet; every percentage here is of the mapped ones.</p>
       <p>A <a href="https://github.com/kotijekriv/openshc-progress/blob/main/.github/workflows/pages.yml">GitHub Actions workflow</a> rebuilds the page every day at 05:17 UTC. The raw numbers are yours too: <a href="data/progress.json">progress.json</a>, <a href="data/functions.json">functions.json</a>.</p>
       <p id="updated">Updated –</p>
     </div>
@@ -380,6 +380,8 @@
   const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const STATE = ['on main', '100% on a branch', 'in progress', 'not started'];
   const STATE_LONG = ['On main', '100% on a branch, waiting to land', 'In progress', 'Not started'];
+  // functions in the 1.41 executable by Ghidra's count (2026-11); OpenSHC hasn't put them all on its list yet
+  const IN_EXE = 4570;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   // "owner-OpenSHC/branch" in the rollup -> "owner:branch", linked to the branch on GitHub
@@ -590,9 +592,10 @@
     function describe() {
       const t = F.totals;
       $('#map-note').textContent = mode === 'addr'
-        ? 'All ' + fmt(n) + ' functions of the game in the order they sit in the executable, from ' + hex(F.rows[0][0]) + ' to ' + hex(F.rows[n - 1][0]) + (cur.compact ? '. Tap a cell to see which function it is, and slide along a row to move between them.' : '. Point at a cell to see its name, and click it for the details.')
+        ? 'The ' + fmt(n) + ' functions OpenSHC has mapped so far, in the order they sit in the executable, from ' + hex(F.rows[0][0]) + ' to ' + hex(F.rows[n - 1][0]) +
+          '. The executable has about ' + fmt(IN_EXE) + ' in all; the rest aren\'t on the list yet' + (cur.compact ? '. Tap a cell to see which function it is, and slide along a row to move between them.' : '. Point at a cell to see its name, and click it for the details.')
         : 'The same ' + fmt(n) + ' functions, grouped by the part of the game they belong to, finished ones first.';
-      cv.setAttribute('aria-label', 'Map of all ' + fmt(n) + ' functions, ' + (mode === 'addr' ? 'in address order' : 'grouped by part of the game') +
+      cv.setAttribute('aria-label', 'Map of the ' + fmt(n) + ' mapped functions, ' + (mode === 'addr' ? 'in address order' : 'grouped by part of the game') +
         ': ' + fmt(t[0]) + ' on main, ' + fmt(t[1]) + ' at 100% on a branch, ' + fmt(t[2]) + ' in progress, ' + fmt(t[3]) + ' not started. Use the arrow keys to move from function to function.');
     }
 
@@ -986,7 +989,7 @@
     for (let k = 0; k < pts.length - 1; k++) maxPrev = Math.max(maxPrev, gainAt(k));
     const gain = t.on_main - t.on_main_week_ago;
     let note = 'Main’s status list shows its first ' + fmt(pts[0].v) + ' matched functions on ' + day.format(new Date(pts[0].d)) + '.';
-    if (half) note += ' Half the game was on main by ' + day.format(new Date(half.d)) + '.';
+    if (half) note += ' Half the mapped functions were on main by ' + day.format(new Date(half.d)) + '.';
     note += ' The last 7 days added ' + fmt(gain) + (gain > maxPrev ? ', more than any week before.' : '.');
     $('#hist-note').textContent = note;
 
@@ -1010,7 +1013,7 @@
       const tx = sv('text', { x: ml - 10, y: y(v), 'text-anchor': 'end', dy: '0.32em' }); tx.textContent = fmt(v); svg.append(tx);
     });
     svg.append(sv('line', { x1: ml, x2: W - mr, y1: y(yMax), y2: y(yMax), stroke: 'var(--ink-3)', 'shape-rendering': 'crispEdges' }));
-    const goal = sv('text', { x: ml, y: y(yMax) - 7, class: 'lab' }); goal.textContent = fmt(yMax) + ': every function of the game'; svg.append(goal);
+    const goal = sv('text', { x: ml, y: y(yMax) - 7, class: 'lab' }); goal.textContent = fmt(yMax) + ': every function mapped so far'; svg.append(goal);
     // month ticks
     const d0 = new Date(pts[0].d);
     let m = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() + 1, 1);

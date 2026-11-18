@@ -1,6 +1,6 @@
 """Draw site/card.png (1200 x 630), the preview image X and other sites show for a link to the page.
 
-It matches the page: the share on main in IBM Plex, and the map of every function of the game in address order,
+It matches the page: the share on main in IBM Plex, and the map of every function OpenSHC has mapped, in address order,
 coloured by where it stands. Dark, so it stands out in both of X's themes.
 
 usage: python scripts/make_card.py [--data site/data] [--out site/card.png]
@@ -80,14 +80,14 @@ def main():
             x += text_width(fig, txt)
 
     line(448, [(format(t['on_main'], ','), MONO_MED, INK), (' of ', MONO, INK2), (format(t['total'], ','), MONO_MED, INK),
-               (' functions on main', MONO, INK2)])
+               (' mapped functions on main', MONO, INK2)])
     line(474, [(('+' if gain >= 0 else '') + format(gain, ','), MONO_MED, INK), (' in the last 7 days', MONO, INK2)])
     line(500, [(format(t['branch_100'], ','), MONO_MED, INK), (' more at 100% on branches', MONO, INK2)])
 
     ax.text(x0, 574, 'kotijekriv.github.io/openshc-progress', fontproperties=MONO, fontsize=12.5, color=INK3,
             va='baseline')
 
-    # right: the whole game, one cell per function, in address order
+    # right: every mapped function, one cell each, in address order
     cols, pitch, size = 64, 8, 6.5
     mx0 = W - 64 - cols * pitch + (pitch - size)
     nrows = -(-len(rows) // cols)

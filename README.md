@@ -6,14 +6,15 @@ Stronghold Crusader, has come: **https://kotijekriv.github.io/openshc-progress/*
 OpenSHC rewrites the game in C++ one function at a time, until Microsoft Visual C++ 2005 compiles each one to the same
 machine code as the game's 1.41 executable. The page shows:
 
-- the share of the game's functions done on main, how many more already match 100% on a branch, and the last 7 days;
-- **a map of the whole game**: one cell per function, all 3,703, in the order they sit in the executable, coloured by
-  where each stands. Clicking or tapping a cell opens a card next to it with the function's name, its best match, the
+- the share of the functions OpenSHC has mapped so far that are done on main, how many more already match 100% on a
+  branch, and the last 7 days;
+- **a map of every function mapped so far**: one cell per function, 3,703 of them, in the order they sit in the
+  executable, coloured by where each stands. Clicking or tapping a cell opens a card next to it with the function's name, its best match, the
   branch holding it and a link to its code on GitHub (on main, or on that branch), with buttons to step to the
   previous and next function; on a phone a finger sliding along a row moves the selection. The map can be regrouped
   by part of the game (animated), searched by name, namespace or address (Enter steps through the matches), walked
   with the arrow keys, and linked to: `?fn=0x0053BC20` selects a function, `?view=parts` opens the grouped view;
-- functions on main over time, against the goal of every function, with what is waiting on branches on top;
+- functions on main over time, against the goal of every mapped function, with what is waiting on branches on top;
 - how a function gets to 100% (Ghidra, C++, MSVC 2005 SP1, reccmp, the DLL), and what the last few percent are;
 - the unfinished functions closest to 100%, how close the rest are, and the branches holding finished work.
 
@@ -24,9 +25,11 @@ the community's work as a whole.
 
 All public, nothing else:
 
-- `status_rollup.tsv` from OpenSHC's `latest-sarif` release: every function of the game and its best match on main
-  or on the branches the project tracks (the file `tools/pick_work.py` reads). Forks it doesn't track can hold more
-  finished work than the page shows.
+- `status_rollup.tsv` from OpenSHC's `latest-sarif` release: every function OpenSHC has mapped so far (declared at its
+  address, with a resolver) and its best match on main or on the branches the project tracks (the file
+  `tools/pick_work.py` reads). Forks it doesn't track can hold more finished work than the page shows. That list isn't
+  the whole game yet: Ghidra finds about 4,570 functions in the 1.41 executable, so about 860 aren't on it, and every
+  percentage on the page is of the mapped ones.
 - OpenSHC's main branch: `status/addresses-SHC-3BB0A8C1.txt` and its git history, for what is on main now and
   how that grew.
 - For the map's links to the code: each function's reccmp annotation (`// FUNCTION: STRONGHOLDCRUSADER 0x…`) on
